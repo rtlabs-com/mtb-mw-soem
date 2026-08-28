@@ -111,7 +111,7 @@ int oshw_mac_init(const uint8_t *mac_address)
    if (init_done)
       return 0;
 
-   /* Create the message buffer–backed queue */
+   /* Create the message buffer-backed queue */
    if (!msg_queue_init(&g_msgq, MSGQ_CAPACITY_BYTES))
    {
       printf("Message queue init failed\n");
@@ -180,6 +180,10 @@ int oshw_mac_init(const uint8_t *mac_address)
    cy_ecm_broadcast_disable(ecm_handle, false);
 
    init_done = true;
+
+   /* Workaround failure to send frames immediately after establishing
+      link seen on some boards */
+   os_tick_sleep (20);
 
    return 0;
 }

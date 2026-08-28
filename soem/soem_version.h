@@ -13,7 +13,7 @@
 #ifndef SOEM_VERSION_H
 #define SOEM_VERSION_H
 
-#define SOEM_GIT_REVISION "release-v0.6.0"
+#define SOEM_GIT_REVISION "release-v0.6.1"
 
 #if !defined(SOEM_VERSION_BUILD) && defined(SOEM_GIT_REVISION)
 #define SOEM_VERSION_BUILD SOEM_GIT_REVISION

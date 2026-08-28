@@ -69,7 +69,7 @@
 
 /* 16-bit up-counting timer used for both timekeeping and compare */
 static cyhal_timer_t s_us_tmr;
-static volatile uint32_t s_time_hi = 0; /* increments by 0x00010000 on overflow
+static volatile uint64_t s_time_hi = 0; /* increments by 0x00010000 on overflow
                                          */
 static os_event_t * s_evt        = NULL;
 static os_mutex_t * s_sleep_lock = NULL;
@@ -83,6 +83,24 @@ static inline uint32_t os_u32_add (uint32_t a, uint32_t b)
 static inline uint32_t os_u32_diff (uint32_t start, uint32_t end)
 {
    return (uint32_t)(end - start);
+}
+
+/* 64-bit overflow-safe read */
+uint64_t os_get_current_time_us_64 (void)
+{
+   uint64_t hi1, hi2;
+   uint32_t lo;
+   do
+   {
+      hi1 = s_time_hi;
+      lo  = cyhal_timer_read (&s_us_tmr) & 0xFFFFu;
+      hi2 = s_time_hi;
+      if (hi1 != hi2)
+      {
+         lo = cyhal_timer_read (&s_us_tmr) & 0xFFFFu;
+      }
+   } while (hi1 != hi2);
+   return (hi1 & 0xFFFFFFFFFFFF0000ull) | lo;
 }
 
 /* fast 16-bit read (single HW access) */
@@ -123,8 +141,12 @@ static void os_us_isr (void * arg, cyhal_timer_event_t event)
 
    if (event & CYHAL_TIMER_IRQ_TERMINAL_COUNT)
    {
-      /* advance upper 16 bits once per 65.536 ms overflow */
+      /* Advance upper 48 bits once per 65.536 ms overflow. The
+         critical section ensures timer can be used safely from ISR
+         context. */
+      uint32_t crit = os_enter_critical();
       s_time_hi += 0x00010000u;
+      os_exit_critical (crit);
    }
 
    if (event & CYHAL_TIMER_IRQ_CAPTURE_COMPARE)
@@ -138,26 +160,15 @@ static void os_us_isr (void * arg, cyhal_timer_event_t event)
 /* fast read (< 65.536 ms) */
 uint32_t os_get_current_time_us_fast (void)
 {
-   uint32_t hi = s_time_hi & 0xFFFF0000u;
+   uint32_t hi = (uint32_t)s_time_hi & 0xFFFF0000u;
    uint32_t lo = cyhal_timer_read (&s_us_tmr) & 0xFFFFu;
    return hi | lo;
 }
 
-/* overflow-safe read  */
+/* overflow-safe read (32-bit) */
 uint32_t os_get_current_time_us (void)
 {
-   uint32_t hi1, hi2, lo;
-   do
-   {
-      hi1 = s_time_hi;
-      lo  = cyhal_timer_read (&s_us_tmr) & 0xFFFFu;
-      hi2 = s_time_hi;
-      if (hi1 != hi2)
-      {
-         lo = cyhal_timer_read (&s_us_tmr) & 0xFFFFu;
-      }
-   } while (hi1 != hi2);
-   return (hi1 & 0xFFFF0000u) | lo;
+   return (uint32_t)os_get_current_time_us_64();
 }
 
 /* ============================== Internals ================================= */
@@ -321,26 +332,18 @@ void os_sleep_us (uint32_t usec)
 
 /* ============================ Time helpers ================================ */
 
-int gettimeofday (os_time_t * tp, void * tzp)
-{
-   (void)tzp;
-   CC_ASSERT (tp != NULL);
-   uint32_t t  = os_get_current_time_us();
-   tp->tv_sec  = t / USECS_PER_SEC;
-   tp->tv_nsec = (t % USECS_PER_SEC) * 1000u;
-   return 0;
-}
-
 os_time_t os_current_time (void)
 {
-   os_time_t r;
-   gettimeofday (&r, 0);
-   return r;
+   os_time_t tp;
+   uint64_t t = os_get_current_time_us_64();
+   tp.tv_sec  = t / USECS_PER_SEC;
+   tp.tv_nsec = (t % USECS_PER_SEC) * 1000u;
+   return tp;
 }
 
 void osal_get_monotonic_time (os_time_t * tv)
 {
-   uint64_t usec = (uint64_t)os_get_current_time_us();
+   uint64_t usec = os_get_current_time_us_64();
    osal_timespec_from_usec (usec, tv);
 }
 

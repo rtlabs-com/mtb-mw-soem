@@ -23,7 +23,7 @@ SOEM EtherCAT Master Library, written in C, is used to write custom EtherCAT Mas
 This library package is an adaptation of SOEM for Modus Toolbox and the XMC72_EVK platform.
 
 - [SOEM User Example](https://github.com/rtlabs-com/mtb-example-soem) - SOEM MTB Example Application on GitHub
-- [SOEM Middleware](https://github.com/rtlabs-com/mtb-mw-uphy) - U-Phy MTB Middleware on GitHub
+- [SOEM Middleware](https://github.com/rtlabs-com/mtb-mw-soem) - SOEM MTB Middleware on GitHub
 - [SOEM](https://rt-labs.com/product/soem/) - General introduction to the SOEM concept and features
 
 Also see https://github.com/OpenEtherCATsociety/SOEM
